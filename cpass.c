@@ -16,7 +16,6 @@ int gpg(char *fpr, char *fp, int d){
     gpgme_set_locale(NULL, LC_CTYPE, setlocale(LC_CTYPE, NULL));
     gpgme_new(&ctx);
     gpgme_set_protocol(ctx, GPGME_PROTOCOL_OpenPGP);
-    puts(fpr);
     err = gpgme_get_key(ctx, fpr, &rkey, 0);
     if (err) {
         fprintf(stderr, "Error getting key: %s\n", gpgme_strerror(err));
@@ -103,7 +102,8 @@ int main(int argc, char *argv[]){
             }
             if (stat(passpath, &st) == -1){
                 mkdir(passpath, 0700);
-            } 
+            }
+            chdir(passpath);
             FILE *fptr = fopen(".gpg-id", "w");
             fprintf(fptr, argv[i+1]);
             fclose(fptr);
