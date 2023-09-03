@@ -5,14 +5,24 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <gpgme.h>
+#include <locale.h>
+#include <dirent.h> 
+
 int gpg(char *fpr, char *fp, int d){
+    gpgme_check_version(NULL);
     gpgme_ctx_t ctx;
     gpgme_error_t err;
     gpgme_key_t rkey = NULL;
-    gpgme_check_version(NULL);
+    gpgme_set_locale(NULL, LC_CTYPE, setlocale(LC_CTYPE, NULL));
     gpgme_new(&ctx);
     gpgme_set_protocol(ctx, GPGME_PROTOCOL_OpenPGP);
-    gpgme_get_key(ctx, fpr, &rkey, 0);
+    puts(fpr);
+    err = gpgme_get_key(ctx, fpr, &rkey, 0);
+    if (err) {
+        fprintf(stderr, "Error getting key: %s\n", gpgme_strerror(err));
+        gpgme_release(ctx);
+        return 1;
+    }
     gpgme_data_t in;
     gpgme_data_t out;
     FILE *ifp;
@@ -61,9 +71,29 @@ int gpg(char *fpr, char *fp, int d){
 }
 struct stat st = {0};
 int main(int argc, char *argv[]){
-    if (argc < 2){puts("err: too few arguments"); exit(1);}
     char *passpath = getenv("HOME");
     strcat(passpath, "/.password-store/");
+    if (argc < 2){
+        if (stat(passpath, &st) == -1){
+            puts("Error: You must run:\n    cpass init your-gpg-id\nbefore you may use the password store.");
+            return 1;
+        }
+        chdir(passpath);
+        DIR *d;
+        struct dirent *dir;
+        d = opendir(".");
+        if (d) {
+            printf("Password Store\n");
+            while ((dir = readdir(d)) != NULL) {
+                char a = dir->d_name[0];
+                if(a == '.') continue;
+                printf("└──%s\n", dir->d_name);
+            }
+            closedir(d);
+        } else {
+            puts("Error: You must run:\n    cpass init your-gpg-id\nbefore you may use the password store.");
+        }
+    }
     for (int i = 1; i < argc; i++){
         if (!strcmp(argv[i], "init")){
             if (i+1==argc){puts("Usage: pass init <gpg-id>");}
@@ -73,8 +103,7 @@ int main(int argc, char *argv[]){
             }
             if (stat(passpath, &st) == -1){
                 mkdir(passpath, 0700);
-            }
-            chdir(passpath); 
+            } 
             FILE *fptr = fopen(".gpg-id", "w");
             fprintf(fptr, argv[i+1]);
             fclose(fptr);
@@ -140,7 +169,6 @@ int main(int argc, char *argv[]){
                 }
                 char password[128];
                 if (stat(passpath, &st) == -1){
-                    puts(passpath);
                     puts("Error: You must run:\n    cpass init your-gpg-id\nbefore you may use the password store.");
                     return 1;
                 }
